@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TADS — Accident Detection</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>TADS</h1>
+    <p>Traffic Accident Detection System</p>
+  </header>
+  <main>
+    <section class="card">
+      <h2>Upload Video</h2>
+      <input type="file" id="videoFile" accept="video/*" />
+      <button id="uploadBtn">Upload & Process</button>
+      <div id="status"></div>
+      <progress id="progress" value="0" max="100" hidden></progress>
+    </section>
+    <section class="card">
+      <h2>Live Alerts</h2>
+      <ul id="alerts"></ul>
+    </section>
+    <section class="card">
+      <h2>Incidents</h2>
+      <ul id="incidents"></ul>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

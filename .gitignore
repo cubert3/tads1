@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Data & outputs
+data/samples/*
+data/incidents/*
+!data/samples/.gitkeep
+!data/incidents/.gitkeep
+output/
+*.mp4
+*.avi
+*.db
+
+# Models (downloaded at runtime)
+*.pt
+*.onnx
+
+# IDE & env
+.env
+.env.*
+.idea/
+.vscode/
+.DS_Store
+
+# Streamlit
+.streamlit/

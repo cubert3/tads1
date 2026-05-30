@@ -1,0 +1,75 @@
+detection:
+  model: yolov8n.pt
+  conf: 0.35
+  imgsz: 640
+  device: cpu
+
+tracking:
+  backend: botsort
+  persist: true
+
+near_miss:
+  proximity_px: 80
+  approach_rate_min: 2.0
+
+collision:
+  iou_threshold: 0.25
+  decel_threshold: 0.40
+  min_signals: 2
+  confirm_frames: 3
+  cooldown_seconds: 10.0
+  cooldown_distance_px: 100.0
+
+clip_filter:
+  enabled: false
+  reject_margin: 0.05
+  model_name: openai/clip-vit-base-patch32
+  prompts:
+    accident: "car accident on road"
+    normal: "normal traffic"
+    stopped: "cars stopped at traffic lights"
+
+calibration:
+  enabled: false
+  meters_per_pixel: null
+  reference_points: []
+
+evidence:
+  pre_seconds: 5
+  post_seconds: 10
+
+road_sos:
+  human_confirm_enabled: true
+  plate_detection_enabled: true
+  location:
+    latitude: 13.6288
+    longitude: 79.4192
+    label: "Tirupati Demo Junction"
+  dispatch:
+    police_number: "+919000000001"
+    ambulance_number: "+919000000002"
+  severity_routing:
+    near_miss: log_only
+    collision: police
+    severe: police_and_ambulance
+
+alerts:
+  webhook_url: null
+  smtp_enabled: false
+  smtp_host: null
+  smtp_port: 587
+  smtp_user: null
+  smtp_password: null
+  smtp_to: null
+
+performance:
+  optical_flow_interval: 3
+  half_precision: false
+  save_annotated_video: true
+  show_overlay: true
+
+paths:
+  samples_dir: data/samples
+  incidents_dir: data/incidents
+  output_dir: output/annotated
+  database_path: data/incidents.db
