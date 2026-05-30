@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import tempfile
+import time as _time
 from pathlib import Path
 
 import streamlit as st
@@ -28,10 +29,19 @@ from dashboard.theme import (
     render_topbar,
     sidebar_block,
 )
-from media.video_reader import VideoSource
 from storage.incident_store import IncidentStore
 from storage.runtime_settings import human_confirm_enabled, set_human_confirm_enabled
 from storage.seed_demo import seed_demo_sync
+from dashboard.debug_log import dbg, dbg_exc
+from dashboard.pipeline_runner import (
+    check_pipeline_job,
+    pipeline_elapsed,
+    pipeline_error_hint,
+    save_upload_chunked,
+    start_pipeline_job,
+)
+
+dbg("app.py:module", "dashboard_loaded", {}, hypothesis_id="H6", run_id="post-fix")
 
 st.set_page_config(
     page_title="Road SOS",
@@ -41,6 +51,16 @@ st.set_page_config(
 )
 
 inject_theme()
+
+if "dbg_run" not in st.session_state:
+    st.session_state.dbg_run = 0
+st.session_state.dbg_run += 1
+dbg(
+    "app.py:startup",
+    "script_rerun",
+    {"run": st.session_state.dbg_run, "processing": st.session_state.get("pipeline_busy", False)},
+    hypothesis_id="H4",
+)
 
 settings = get_settings()
 store = IncidentStore(settings.resolve_path(settings.paths.database_path))
@@ -52,10 +72,15 @@ if "human_confirm" not in st.session_state:
     st.session_state.human_confirm = human_confirm_enabled(road.human_confirm_enabled)
 
 if "demo_seeded" not in st.session_state:
-    existing = asyncio.run(store.list_all())
-    if not existing:
-        seed_demo_sync(force=False)
-    st.session_state.demo_seeded = True
+    try:
+        existing = asyncio.run(store.list_all())
+        if not existing:
+            seed_demo_sync(force=False)
+        st.session_state.demo_seeded = True
+        dbg("app.py:seed", "demo_seed_done", {"had_existing": bool(existing)}, hypothesis_id="H4")
+    except Exception as exc:
+        dbg_exc("app.py:seed", exc, hypothesis_id="H3")
+        raise
 
 
 async def load_incidents(severity=None, state=None):
@@ -134,28 +159,33 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
+    st.divider()
+    page = st.radio(
+        "View",
+        ["Operations", "Analysis lab", "Incident registry", "Dispatch log", "Cooldown zones", "Statistics"],
+        key="nav_page",
+        label_visibility="collapsed",
+    )
+    dbg("app.py:sidebar", "page_selected", {"page": page}, hypothesis_id="H4", run_id="post-fix")
+
 # —— Main shell ——
 render_topbar("Emergency Response · Traffic Incident Detection")
 
-tab_live, tab_lab, tab_incidents, tab_dispatch, tab_cooldown, tab_analytics = st.tabs(
-    [
-        "Operations",
-        "Analysis lab",
-        "Incident registry",
-        "Dispatch log",
-        "Cooldown zones",
-        "Statistics",
-    ]
-)
-
 # —— Operations ——
-with tab_live:
+if page == "Operations":
     render_section(
         "Operations center",
         "Monitor active queue, confirm detections, and review the most recent verified incident.",
     )
+    _t0 = _time.perf_counter()
     pending = asyncio.run(load_incidents(state="pending_review"))
     confirmed = asyncio.run(load_incidents(state="confirmed"))
+    dbg(
+        "app.py:tab_live",
+        "tab_loaded",
+        {"ms": round((_time.perf_counter() - _t0) * 1000), "pending": len(pending), "confirmed": len(confirmed)},
+        hypothesis_id="H4",
+    )
 
     render_stat_grid(
         [
@@ -230,7 +260,7 @@ with tab_live:
     )
 
 # —— Analysis lab ——
-with tab_lab:
+elif page == "Analysis lab":
     render_section(
         "Analysis lab",
         "Process recorded footage through the detection pipeline for validation and demonstration.",
@@ -241,65 +271,92 @@ with tab_lab:
         "One-time setup: deps, yolov8n.pt, lap. See docs/SETUP_AND_TRAINING.md."
     )
 
-    def _run_pipeline(video_path: Path, source_label: str, out_name: str) -> None:
+    def _queue_pipeline_job(video_path: Path, out_name: str) -> None:
         if not video_path.exists():
             st.error(f"File not found: {video_path}")
             return
-        status = st.status("Processing video", expanded=True)
-        try:
-            status.write(f"Input: {source_label}")
-            status.write("Loading YOLO + tracker — first run may take a minute…")
-            processor = AccidentDetectionProcessor(settings=settings)
-            result = processor.process_source(VideoSource.from_file(video_path), output_name=out_name)
-            for inc in result.incidents:
-                inc.source_video = source_label
-                asyncio.run(store.save(inc))
-            status.update(label="Complete", state="complete")
-            render_stat_grid(
-                [
-                    ("Frames", str(result.frames_processed), ""),
-                    ("Throughput", f"{result.fps_avg:.1f} FPS", ""),
-                    ("Incidents", str(len(result.incidents)), "critical" if result.incidents else ""),
-                ]
+        if st.session_state.get("pipeline_proc") is not None:
+            st.warning("A job is already running.")
+            return
+        st.session_state.pipeline_busy = True
+        st.session_state.pipeline_proc = start_pipeline_job(video_path, out_name)
+        st.session_state.pipeline_out = out_name
+        st.session_state.pipeline_started = _time.time()
+        st.session_state.pop("pipeline_error", None)
+        st.session_state.pop("pipeline_done_out", None)
+        dbg("app.py:tab_lab", "job_queued", {"path": str(video_path), "out": out_name}, hypothesis_id="H2", run_id="post-fix")
+
+    @st.fragment(run_every=2)
+    def _pipeline_monitor() -> None:
+        state = check_pipeline_job(st.session_state, output_dir)
+        if state == "running":
+            st.status(
+                f"Processing in background — {pipeline_elapsed(st.session_state)}s. Keep this tab open.",
+                state="running",
             )
-            if result.annotated_path and result.annotated_path.exists():
-                st.video(str(result.annotated_path))
-            if not result.incidents:
-                st.warning("No incidents confirmed — tune config/settings.yaml or try another clip.")
-        except Exception as exc:
-            status.update(label="Failed", state="error")
-            st.error(f"Processing failed: {exc}")
+        elif state == "success":
+            out_name = st.session_state.get("pipeline_done_out", "dashboard_test.mp4")
+            st.success("Processing complete.")
+            out_path = output_dir / out_name
+            if out_path.exists() and out_path.stat().st_size > 10_000:
+                st.video(str(out_path))
+            else:
+                st.info("Check output/annotated/ and Incident registry.")
+        elif state == "failed":
+            st.error(f"Pipeline failed. {pipeline_error_hint()}")
 
-    with st.form("pipeline_form", clear_on_submit=False):
-        uploaded = st.file_uploader(
-            "Source footage",
-            type=["mp4", "avi", "mov", "mkv"],
-            help="Select a file, then click Execute pipeline in this form.",
-        )
-        out_name = st.text_input("Output label", value="dashboard_test.mp4")
-        submitted = st.form_submit_button("Execute pipeline", type="primary")
+    _pipeline_monitor()
 
-    if submitted:
-        if uploaded is None:
-            st.error("No file selected. Pick a video above, then click Execute pipeline.")
-        else:
-            tmp_path = Path(tempfile.gettempdir()) / f"tads_{uploaded.name}"
-            tmp_path.write_bytes(uploaded.getvalue())
-            _run_pipeline(tmp_path, uploaded.name, out_name)
+    uploads_dir = settings.resolve_path("data/uploads")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
 
-    render_section("Local sample library", "Process from disk — reliable if browser upload fails.")
+    st.info("Recommended: use **Process sample from disk** below to avoid browser upload disconnects.")
+
+    uploaded = st.file_uploader(
+        "Source footage (optional)",
+        type=["mp4", "avi", "mov", "mkv"],
+        key="lab_upload",
+    )
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Save upload to disk", disabled=uploaded is None):
+            if uploaded is None:
+                st.error("Select a file first.")
+            elif uploaded.size and uploaded.size > 500 * 1024 * 1024:
+                st.error("File exceeds 500 MB.")
+            else:
+                try:
+                    dbg("app.py:tab_lab", "save_upload_click", {"size": uploaded.size}, hypothesis_id="H1", run_id="post-fix")
+                    dest = uploads_dir / uploaded.name
+                    save_upload_chunked(uploaded, dest)
+                    st.session_state.upload_path = str(dest)
+                    st.success(f"Saved ({uploaded.size // (1024 * 1024)} MB).")
+                except Exception as exc:
+                    dbg_exc("app.py:tab_lab", exc, hypothesis_id="H3", run_id="post-fix")
+                    st.error(str(exc))
+    with col_b:
+        out_name_upload = st.text_input("Output label", value="dashboard_test.mp4", key="out_upload")
+        if st.button("Execute saved upload", type="primary"):
+            path_str = st.session_state.get("upload_path")
+            if not path_str:
+                st.error("Click **Save upload to disk** first.")
+            else:
+                _queue_pipeline_job(Path(path_str), out_name_upload)
+
+    render_section("Local sample library", "Process from disk — most reliable.")
     samples = settings.resolve_path(settings.paths.samples_dir)
     sample_videos = sorted(samples.glob("*.mp4")) if samples.exists() else []
     if sample_videos:
         choice = st.selectbox("Sample file", [v.name for v in sample_videos], key="sample_pick")
+        out_name_sample = st.text_input("Output label", value=f"annotated_{Path(choice).stem}.mp4", key="out_sample")
         if st.button("Process sample from disk", type="primary"):
-            _run_pipeline(samples / choice, choice, f"annotated_{Path(choice).stem}.mp4")
+            _queue_pipeline_job(samples / choice, out_name_sample)
     else:
         render_empty("Put .mp4 files in data/samples/ then use Process sample from disk.")
 
 
 # —— Incident registry ——
-with tab_incidents:
+elif page == "Incident registry":
     render_section("Incident registry", "Search, filter, and adjudicate stored detections.")
 
     f1, f2, f3 = st.columns([1, 1, 1])
@@ -372,13 +429,15 @@ with tab_incidents:
 
 
 # —— Dispatch log ——
-with tab_dispatch:
+elif page == "Dispatch log":
     rt = road.severity_routing
     render_section(
         "Dispatch log",
         f"Routing policy — near miss: {rt.near_miss}, collision: {rt.collision}, severe: {rt.severe}",
     )
+    _t0 = _time.perf_counter()
     logs = asyncio.run(load_dispatch())
+    dbg("app.py:tab_dispatch", "tab_loaded", {"ms": round((_time.perf_counter() - _t0) * 1000)}, hypothesis_id="H4")
     if logs:
         render_html_table(
             logs,
@@ -395,7 +454,7 @@ with tab_dispatch:
         render_empty("No dispatch events recorded. Confirm an incident to initiate routing.")
 
 # —— Cooldown zones ——
-with tab_cooldown:
+elif page == "Cooldown zones":
     render_section(
         "Cooldown zones",
         f"Duplicate suppression — {settings.collision.cooldown_seconds}s window, "
@@ -418,7 +477,7 @@ with tab_cooldown:
         render_empty("No cooldown zones in the current window.")
 
 # —— Statistics ——
-with tab_analytics:
+elif page == "Statistics":
     render_section("Operational statistics", "Aggregate incident classification for the active dataset.")
     summary = asyncio.run(load_analytics())
     pending_n = summary.get("pending_review", 0)
