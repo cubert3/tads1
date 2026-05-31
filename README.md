@@ -23,7 +23,7 @@ AI-based road accident detection using **integration over invention**: pretraine
 streamlit run dashboard/app.py
 ```
 
-Mission-critical UI (IBM Plex typography, restrained palette, flat panels): **Operations** · **Analysis lab** · **Incident registry** · **Dispatch log** · **Cooldown zones** · **Statistics**. Styles live in `dashboard/theme.py`.
+Mission-critical UI (IBM Plex typography, restrained palette): **Live operations** · **Upload & test lab** · **Incidents** · **Dispatch log** · **Cameras & health** · **Analytics**. Styles live in `dashboard/theme.py`.
 
 Configure demo phones and routing in [`config/settings.yaml`](config/settings.yaml) under `road_sos`.
 

@@ -1,187 +1,60 @@
-INFO Processing: C:\Users\Pranav\Desktop\Pranav\tads\data\samples\Road Safety_ What are the causes of this accident __ Cyberabad Traffic Police.mp4
-INFO Performance estimate: ~16.9 FPS (realtime factor 0.56x)
-INFO Done — 888 frames @ 0.2 FPS
-INFO Estimated vs actual: ~16.9 est / 0.2 actual FPS
-INFO Incidents: 180
-INFO Annotated video: C:\Users\Pranav\Desktop\Pranav\tads\output\annotated\annotated_Road Safety_ What are the causes of this accident __ Cyberabad Traffic Police.mp4
-INFO   [collision] collision score=0.45 @ 0.2s
-INFO   [collision] collision score=0.50 @ 0.2s
-INFO   [collision] collision score=0.50 @ 0.3s
-INFO   [collision] collision score=0.50 @ 0.4s
-INFO   [collision] collision score=0.50 @ 0.5s
-INFO   [collision] collision score=0.50 @ 0.7s
-INFO   [collision] collision score=0.50 @ 0.8s
-INFO   [collision] collision score=0.60 @ 1.1s
-INFO   [collision] collision score=0.85 @ 1.1s
-INFO   [collision] collision score=0.50 @ 1.3s
-INFO   [collision] collision score=0.50 @ 1.3s
-INFO   [collision] collision score=0.50 @ 1.3s
-INFO   [collision] collision score=0.50 @ 1.3s
-INFO   [collision] collision score=0.35 @ 1.4s
-INFO   [collision] collision score=0.35 @ 1.4s
-INFO   [collision] collision score=0.35 @ 1.4s
-INFO   [collision] collision score=0.35 @ 1.4s
-INFO   [collision] collision score=0.90 @ 1.5s
-INFO   [severe] collision score=0.70 @ 1.6s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.50 @ 1.7s
-INFO   [collision] collision score=0.70 @ 1.8s
-INFO   [collision] collision score=0.35 @ 1.8s
-INFO   [collision] collision score=0.35 @ 1.8s
-INFO   [collision] collision score=0.50 @ 1.8s
-INFO   [collision] collision score=0.35 @ 1.8s
-INFO   [collision] collision score=0.35 @ 1.8s
-INFO   [collision] collision score=0.35 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.45 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.50 @ 1.9s
-INFO   [collision] collision score=0.35 @ 1.9s
-INFO   [collision] collision score=0.70 @ 2.0s
-INFO   [collision] collision score=0.50 @ 2.0s
-INFO   [collision] collision score=0.70 @ 2.0s
-INFO   [collision] collision score=0.35 @ 2.0s
-INFO   [collision] collision score=0.40 @ 2.9s
+INFO Processing: C:\Users\Pranav\Desktop\Pranav\tads\data\samples\tbone (5).mp4
+INFO Performance estimate: ~16.9 FPS (realtime factor 0.76x)
+INFO Progress: 30 / 664 frames (1.4 fps)
+INFO Progress: 60 / 664 frames (1.6 fps)
+INFO Progress: 90 / 664 frames (1.8 fps)
+INFO Progress: 120 / 664 frames (1.9 fps)
+INFO Progress: 150 / 664 frames (2.1 fps)
+INFO Progress: 180 / 664 frames (2.3 fps)
+INFO Progress: 210 / 664 frames (2.4 fps)
+INFO Progress: 240 / 664 frames (2.5 fps)
+INFO Progress: 270 / 664 frames (2.6 fps)
+INFO Progress: 300 / 664 frames (2.7 fps)
+INFO Progress: 330 / 664 frames (2.8 fps)
+INFO Progress: 360 / 664 frames (2.8 fps)
+INFO Progress: 390 / 664 frames (2.9 fps)
+INFO Progress: 420 / 664 frames (2.8 fps)
+INFO Progress: 450 / 664 frames (2.8 fps)
+INFO Progress: 480 / 664 frames (2.8 fps)
+INFO Progress: 510 / 664 frames (2.8 fps)
+INFO Progress: 540 / 664 frames (2.6 fps)
+INFO Progress: 570 / 664 frames (2.7 fps)
+INFO Progress: 600 / 664 frames (2.6 fps)
+INFO Progress: 630 / 664 frames (2.6 fps)
+INFO Progress: 660 / 664 frames (2.6 fps)
+INFO Progress: 664 / 664 frames (2.6 fps)
+INFO Done — 664 frames @ 2.6 FPS
+INFO Estimated vs actual: ~16.9 est / 2.6 actual FPS
+INFO Incidents: 31
+INFO Annotated video: C:\Users\Pranav\Desktop\Pranav\tads\output\annotated\lab_headon-nn.mp4
+INFO   [collision] collision score=0.40 @ 0.4s
+INFO   [collision] collision score=0.40 @ 0.6s
+INFO   [collision] collision score=0.40 @ 0.6s
+INFO   [collision] collision score=0.40 @ 0.7s
+INFO   [near_miss] near_miss score=0.20 @ 0.9s
+INFO   [collision] collision score=0.50 @ 1.2s
+INFO   [collision] collision score=0.50 @ 1.2s
+INFO   [collision] collision score=0.35 @ 1.2s
+INFO   [collision] collision score=0.35 @ 1.2s
+INFO   [collision] collision score=0.35 @ 1.2s
+INFO   [collision] collision score=0.35 @ 1.5s
+INFO   [collision] collision score=0.50 @ 2.3s
+INFO   [collision] collision score=0.50 @ 2.4s
+INFO   [collision] collision score=0.40 @ 3.1s
+INFO   [collision] collision score=0.40 @ 3.6s
 INFO   [collision] collision score=0.40 @ 4.2s
-INFO   [collision] collision score=0.40 @ 5.1s
-INFO   [collision] collision score=0.40 @ 9.2s
-INFO   [collision] collision score=0.40 @ 9.3s
-INFO   [near_miss] near_miss score=0.45 @ 9.5s
-INFO   [collision] collision score=0.40 @ 12.4s
-INFO   [collision] collision score=0.40 @ 13.1s
-INFO   [collision] collision score=0.40 @ 14.2s
-INFO   [collision] collision score=0.40 @ 14.2s
-INFO   [collision] collision score=0.40 @ 14.2s
-INFO   [collision] collision score=0.50 @ 14.2s
-INFO   [collision] collision score=0.50 @ 14.2s
-INFO   [collision] collision score=0.50 @ 14.2s
-INFO   [collision] collision score=0.50 @ 14.2s
-INFO   [collision] collision score=0.50 @ 14.2s
-INFO   [collision] collision score=0.35 @ 14.3s
-INFO   [collision] collision score=0.50 @ 14.4s
-INFO   [collision] collision score=0.50 @ 14.8s
-INFO   [collision] collision score=0.50 @ 14.8s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 15.0s
-INFO   [collision] collision score=0.40 @ 16.5s
-INFO   [collision] collision score=0.40 @ 16.5s
-INFO   [collision] collision score=0.40 @ 16.5s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 16.8s
-INFO   [collision] collision score=0.40 @ 17.0s
-INFO   [collision] collision score=0.40 @ 17.0s
-INFO   [collision] collision score=0.40 @ 17.1s
-INFO   [collision] collision score=0.40 @ 17.4s
-INFO   [collision] collision score=0.40 @ 17.4s
-INFO   [collision] collision score=0.40 @ 17.4s
-INFO   [collision] collision score=0.40 @ 17.4s
-INFO   [severe] collision score=0.80 @ 17.5s
-INFO   [collision] collision score=0.40 @ 17.5s
-INFO   [collision] collision score=0.40 @ 17.5s
-INFO   [collision] collision score=0.40 @ 18.1s
-INFO   [collision] collision score=0.40 @ 18.1s
-INFO   [collision] collision score=0.40 @ 18.4s
-INFO   [collision] collision score=0.40 @ 18.4s
-INFO   [collision] collision score=0.40 @ 19.0s
-INFO   [collision] collision score=0.40 @ 19.3s
-INFO   [collision] collision score=0.40 @ 19.3s
-INFO   [collision] collision score=0.40 @ 19.4s
-INFO   [collision] collision score=0.40 @ 19.5s
-INFO   [collision] collision score=0.40 @ 19.5s
-INFO   [collision] collision score=0.40 @ 19.7s
-INFO   [collision] collision score=0.40 @ 19.7s
-INFO   [collision] collision score=0.40 @ 19.8s
-INFO   [collision] collision score=0.40 @ 19.8s
-INFO   [collision] collision score=0.40 @ 19.9s
-INFO   [collision] collision score=0.40 @ 19.9s
-INFO   [near_miss] near_miss score=0.45 @ 19.9s
-INFO   [severe] collision score=0.75 @ 20.1s
-INFO   [severe] collision score=0.75 @ 20.1s
-INFO   [severe] collision score=0.95 @ 20.2s
-INFO   [collision] collision score=0.40 @ 20.2s
-INFO   [collision] collision score=0.40 @ 20.2s
-INFO   [collision] collision score=0.40 @ 20.2s
-INFO   [severe] collision score=0.75 @ 20.3s
-INFO   [collision] collision score=0.40 @ 20.6s
-INFO   [severe] collision score=0.60 @ 20.7s
-INFO   [collision] collision score=0.40 @ 20.6s
-INFO   [collision] collision score=0.40 @ 20.8s
-INFO   [collision] collision score=0.40 @ 20.8s
-INFO   [collision] collision score=0.40 @ 21.0s
-INFO   [collision] collision score=0.40 @ 21.0s
-INFO   [collision] collision score=0.40 @ 21.0s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.1s
-INFO   [collision] collision score=0.40 @ 21.2s
-INFO   [collision] collision score=0.40 @ 21.2s
-INFO   [collision] collision score=0.40 @ 21.2s
-INFO   [collision] collision score=0.40 @ 21.2s
-INFO   [collision] collision score=0.40 @ 21.2s
-INFO   [collision] collision score=0.40 @ 21.6s
-INFO   [collision] collision score=0.40 @ 21.8s
-INFO   [collision] collision score=0.40 @ 22.0s
-INFO   [collision] collision score=0.40 @ 22.0s
-INFO   [collision] collision score=0.40 @ 22.2s
-INFO   [near_miss] near_miss score=0.35 @ 22.8s
-INFO   [collision] collision score=0.40 @ 22.9s
-INFO   [collision] collision score=0.40 @ 22.9s
-INFO   [collision] collision score=0.40 @ 23.0s
-INFO   [collision] collision score=0.40 @ 23.1s
-INFO   [collision] collision score=0.40 @ 23.1s
-INFO   [collision] collision score=0.40 @ 23.1s
-INFO   [collision] collision score=0.40 @ 23.2s
-INFO   [collision] collision score=0.40 @ 23.2s
-INFO   [near_miss] near_miss score=0.35 @ 23.7s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.0s
-INFO   [collision] collision score=0.40 @ 24.1s
-INFO   [collision] collision score=0.40 @ 24.1s
-INFO   [collision] collision score=0.40 @ 24.4s
-INFO   [collision] collision score=0.40 @ 24.4s
-INFO   [collision] collision score=0.40 @ 24.5s
-INFO   [collision] collision score=0.40 @ 24.8s
-INFO   [collision] collision score=0.60 @ 24.8s
-INFO   [collision] collision score=0.50 @ 24.9s
-INFO   [collision] collision score=0.40 @ 25.0s
-INFO   [collision] collision score=0.50 @ 25.1s
-INFO   [severe] collision score=0.60 @ 25.2s
-INFO   [severe] collision score=0.60 @ 25.2s
-INFO   [collision] collision score=0.40 @ 25.2s
-INFO   [collision] collision score=0.40 @ 25.2s
-INFO   [collision] collision score=0.40 @ 25.3s
-INFO   [collision] collision score=0.40 @ 25.3s
-INFO   [collision] collision score=0.40 @ 25.4s
-INFO   [collision] collision score=0.40 @ 25.4s
-INFO   [collision] collision score=0.60 @ 25.8s
-INFO   [collision] collision score=0.40 @ 25.9s
-INFO   [collision] collision score=0.40 @ 25.9s
-INFO   [collision] collision score=0.40 @ 25.9s
-INFO   [collision] collision score=0.40 @ 25.9s
+INFO   [collision] collision score=0.40 @ 4.2s
+INFO   [collision] collision score=0.40 @ 8.2s
+INFO   [near_miss] near_miss score=0.35 @ 15.9s
+INFO   [collision] collision score=0.40 @ 17.8s
+INFO   [collision] collision score=0.40 @ 17.8s
+INFO   [collision] collision score=0.40 @ 17.8s
+INFO   [collision] collision score=0.40 @ 17.8s
+INFO   [collision] collision score=0.40 @ 17.8s
+INFO   [collision] collision score=0.40 @ 24.2s
+INFO   [collision] collision score=0.40 @ 24.2s
+INFO   [collision] collision score=0.40 @ 24.2s
+INFO   [collision] collision score=0.40 @ 24.2s
+INFO   [collision] collision score=0.40 @ 24.2s
+INFO   [collision] collision score=0.40 @ 29.0s
+INFO   [collision] collision score=0.40 @ 29.1s

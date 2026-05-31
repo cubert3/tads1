@@ -79,6 +79,21 @@ class IncidentStore:
         finally:
             await conn.close()
 
+    async def list_since(self, since_ts: float, limit: int = 500) -> list[dict]:
+        conn = await self.db.connect()
+        try:
+            cursor = await conn.execute(
+                """
+                SELECT * FROM incidents WHERE created_at >= ?
+                ORDER BY created_at DESC LIMIT ?
+                """,
+                (since_ts, limit),
+            )
+            rows = await cursor.fetchall()
+            return [self._row_to_dict(row, cursor) for row in rows]
+        finally:
+            await conn.close()
+
     async def list_all(
         self,
         severity: str | None = None,
@@ -205,7 +220,60 @@ class IncidentStore:
             by_severity = {row[0]: row[1] for row in rows}
             cursor2 = await conn.execute("SELECT COUNT(*) FROM incidents WHERE state = 'pending_review'")
             pending = (await cursor2.fetchone())[0]
-            return {"by_severity": by_severity, "pending_review": pending}
+            day_start = time.time() - 86400
+            cursor3 = await conn.execute(
+                """
+                SELECT severity, COUNT(*) FROM incidents
+                WHERE created_at >= ? AND severity IN ('collision', 'near_miss', 'severe')
+                GROUP BY severity
+                """,
+                (day_start,),
+            )
+            today_rows = await cursor3.fetchall()
+            today_by_severity = {row[0]: row[1] for row in today_rows}
+            return {
+                "by_severity": by_severity,
+                "pending_review": pending,
+                "today_by_severity": today_by_severity,
+            }
+        finally:
+            await conn.close()
+
+    async def analytics_timeline(self, limit: int = 200) -> list[dict]:
+        conn = await self.db.connect()
+        try:
+            cursor = await conn.execute(
+                """
+                SELECT id, severity, event_type, score, created_at, timestamp_sec
+                FROM incidents
+                WHERE state IN ('confirmed', 'pending_review')
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in rows]
+        finally:
+            await conn.close()
+
+    async def map_pins(self, limit: int = 50) -> list[dict]:
+        conn = await self.db.connect()
+        try:
+            cursor = await conn.execute(
+                """
+                SELECT id, severity, latitude, longitude, location_label, created_at
+                FROM incidents
+                WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            cols = [d[0] for d in cursor.description]
+            return [dict(zip(cols, row)) for row in rows]
         finally:
             await conn.close()
 

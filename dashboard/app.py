@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-import os
 import sys
 import time as _time
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -12,33 +12,22 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from dashboard.debug_log import dbg, dbg_exc
-
-dbg("app.py:entry", "script_start", {"pid": os.getpid()}, hypothesis_id="H6", run_id="post-fix")
-
 from core.config import get_settings
-from dashboard.theme import (
-    SEVERITY_CLASS,
-    inject_theme,
-    plot_cooldown_chart,
-    render_analytics_bars,
-    render_badge,
-    render_empty,
-    render_html_table,
-    render_meta_grid,
-    render_panel_header,
-    render_section,
-    render_stat_grid,
-    render_topbar,
-    sidebar_block,
+from dashboard.collision_hero import load_run_primary, render_collision_hero, render_lab_detection_result
+from dashboard.pipeline_monitor import render_pipeline_monitor
+import dashboard.pipeline_runner as pipeline_runner
+from dashboard.screens import (
+    render_analytics_screen,
+    render_cameras_screen,
+    render_dispatch_screen,
+    render_incidents_screen,
+    render_live_operations,
+    render_test_lab,
 )
+from dashboard.theme import inject_theme, render_topbar, sidebar_block
 from storage.incident_store import IncidentStore
 from storage.runtime_settings import human_confirm_enabled, set_human_confirm_enabled
 from storage.seed_demo import seed_demo_sync
-from dashboard.pipeline_runner import pipeline_error_hint, start_pipeline_job
-from dashboard.pipeline_monitor import render_pipeline_monitor
-
-dbg("app.py:module", "dashboard_loaded", {}, hypothesis_id="H6", run_id="post-fix")
 
 st.set_page_config(
     page_title="Road SOS",
@@ -49,61 +38,27 @@ st.set_page_config(
 
 inject_theme()
 
-if "dbg_run" not in st.session_state:
-    st.session_state.dbg_run = 0
-st.session_state.dbg_run += 1
-dbg(
-    "app.py:startup",
-    "script_rerun",
-    {"run": st.session_state.dbg_run, "processing": st.session_state.get("pipeline_busy", False)},
-    hypothesis_id="H4",
-)
-
 settings = get_settings()
 store = IncidentStore(settings.resolve_path(settings.paths.database_path))
 incidents_dir = settings.resolve_path(settings.paths.incidents_dir)
 output_dir = settings.resolve_path(settings.paths.output_dir)
+uploads_dir = settings.resolve_path("data/uploads")
+samples_dir = settings.resolve_path(settings.paths.samples_dir)
 road = settings.road_sos
+API_BASE = st.session_state.get("api_base", "http://127.0.0.1:8000")
 
 if "human_confirm" not in st.session_state:
     st.session_state.human_confirm = human_confirm_enabled(road.human_confirm_enabled)
 
 if "demo_seeded" not in st.session_state:
-    try:
-        existing = asyncio.run(store.list_all())
-        if not existing:
-            seed_demo_sync(force=False)
-        st.session_state.demo_seeded = True
-        dbg("app.py:seed", "demo_seed_done", {"had_existing": bool(existing)}, hypothesis_id="H4")
-    except Exception as exc:
-        dbg_exc("app.py:seed", exc, hypothesis_id="H3")
-        raise
+    existing = asyncio.run(store.list_all())
+    if not existing:
+        seed_demo_sync(force=False)
+    st.session_state.demo_seeded = True
 
 
 async def load_incidents(severity=None, state=None):
     return await store.list_all(severity=severity, state=state)
-
-
-async def load_dispatch():
-    return await store.list_dispatch_log()
-
-
-async def load_cooldown():
-    return await store.list_cooldown_zones()
-
-
-async def load_analytics():
-    return await store.analytics_summary()
-
-
-def _severity_tone(sev: str) -> str:
-    if sev in ("severe", "collision"):
-        return "critical"
-    if sev in ("near_miss", "pending_review"):
-        return "warning"
-    if sev == "confirmed":
-        return "ok"
-    return ""
 
 
 def _confirm_incident(incident_id: str) -> None:
@@ -120,378 +75,177 @@ def _dismiss_incident(incident_id: str) -> None:
     asyncio.run(proc.dismiss_incident(incident_id))
 
 
-def _esc_path(s: str) -> str:
-    import html
+def _queue_pipeline_job(video_path: Path, out_name: str) -> None:
+    if not video_path.exists():
+        st.error(f"File not found: {video_path}")
+        return
+    if st.session_state.get("pipeline_pid") is not None:
+        st.warning("A job is already running.")
+        return
+    st.session_state.pipeline_busy = True
+    st.session_state.pipeline_pid = pipeline_runner.start_pipeline_job(video_path, out_name)
+    st.session_state.pipeline_out = out_name
+    st.session_state.pipeline_started = _time.time()
+    st.session_state.pipeline_source_video = str(video_path)
+    st.session_state.pop("pipeline_error", None)
+    st.session_state.pop("pipeline_done_out", None)
+    st.session_state.pop("show_collision_hero", None)
+    st.session_state.pop("_pipeline_success_rerun", None)
+    st.session_state.pop("_pipeline_failed_rerun", None)
+    st.rerun()
 
-    return html.escape(s)
+
+def _sync_pipeline_from_disk() -> None:
+    fn = getattr(pipeline_runner, "sync_pipeline_session", None)
+    if fn is not None:
+        fn(st.session_state, output_dir)
 
 
-# —— Sidebar: operational configuration ——
+_sync_pipeline_from_disk()
+
+
+# —— Sidebar ——
 with st.sidebar:
-    st.markdown(
-        '<p class="rsos-sidebar-label" style="margin-top:0;">Control plane</p>',
-        unsafe_allow_html=True,
-    )
-    hc = st.toggle(
-        "Human confirm before dispatch",
-        value=st.session_state.human_confirm,
-        help="Incidents require operator approval before emergency routing.",
-    )
+    st.markdown('<p class="rsos-sidebar-label" style="margin-top:0;">Control plane</p>', unsafe_allow_html=True)
+    role = st.selectbox("Role", ["Operator", "Administrator"], key="user_role")
+    hc = st.toggle("Human confirm before dispatch", value=st.session_state.human_confirm)
     if hc != st.session_state.human_confirm:
         st.session_state.human_confirm = hc
         set_human_confirm_enabled(hc)
 
     st.divider()
-
-    if st.button("Reload demo dataset", help="Resets sample incidents, dispatch log, and cooldown zones"):
-        seed_demo_sync(force=True)
-        st.rerun()
+    if role == "Administrator":
+        if st.button("Reload demo dataset"):
+            seed_demo_sync(force=True)
+            st.rerun()
+        st.text_input("API base URL", value=API_BASE, key="api_base")
 
     sidebar_block("Post location", road.location.label, mono=f"{road.location.latitude:.5f}, {road.location.longitude:.5f}")
-
-    sidebar_block("Police line", road.dispatch.police_number or "Not configured")
-    sidebar_block("Ambulance line", road.dispatch.ambulance_number or "Not configured")
-
-    st.markdown('<p class="rsos-sidebar-label">Severity routing</p>', unsafe_allow_html=True)
-    routing = road.severity_routing
-    for label, key in [("Near miss", routing.near_miss), ("Collision", routing.collision), ("Severe", routing.severe)]:
-        st.markdown(
-            f'<div class="rsos-routing-line"><span class="rsos-routing-key">{label}</span>{key}</div>',
-            unsafe_allow_html=True,
-        )
+    sidebar_block("Police", road.dispatch.police_number or "Not set")
+    sidebar_block("Ambulance", road.dispatch.ambulance_number or "Not set")
 
     st.divider()
     page = st.radio(
         "View",
-        ["Operations", "Analysis lab", "Incident registry", "Dispatch log", "Cooldown zones", "Statistics"],
+        [
+            "Live operations",
+            "Upload & test lab",
+            "Incidents",
+            "Dispatch log",
+            "Cameras & health",
+            "Analytics",
+        ],
         key="nav_page",
         label_visibility="collapsed",
     )
-    dbg("app.py:sidebar", "page_selected", {"page": page}, hypothesis_id="H4", run_id="post-fix")
 
-# Background job monitor (stable module-level fragment; survives reruns)
 if st.session_state.get("pipeline_pid"):
     render_pipeline_monitor(output_dir)
 
-# —— Main shell ——
-render_topbar("Emergency Response · Traffic Incident Detection")
+pipeline_busy = bool(st.session_state.get("pipeline_pid"))
+from storage.runtime_settings import get_camera_config
 
-# —— Operations ——
-if page == "Operations":
-    render_section(
-        "Operations center",
-        "Monitor active queue, confirm detections, and review the most recent verified incident.",
+cam = get_camera_config()
+conn = "degraded" if pipeline_busy else ("online" if cam.get("url") else "offline")
+
+render_topbar(
+    clock=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    camera_name=cam["name"],
+    connection=conn,
+    webhook_on=bool(settings.alerts.webhook_url),
+)
+
+page = st.session_state.get("nav_page", "Live operations")
+
+if page != "Upload & test lab" and (
+    st.session_state.get("show_collision_hero")
+    or (st.session_state.get("pipeline_done_out") and not st.session_state.get("pipeline_pid"))
+):
+    primary, run_events = load_run_primary(
+        store,
+        st.session_state.get("pipeline_started"),
+        st.session_state.get("pipeline_source_video"),
     )
-    _t0 = _time.perf_counter()
-    pending = asyncio.run(load_incidents(state="pending_review"))
-    confirmed = asyncio.run(load_incidents(state="confirmed"))
-    dbg(
-        "app.py:tab_live",
-        "tab_loaded",
-        {"ms": round((_time.perf_counter() - _t0) * 1000), "pending": len(pending), "confirmed": len(confirmed)},
-        hypothesis_id="H4",
-    )
-
-    render_stat_grid(
-        [
-            ("Pending review", str(len(pending)), "warning" if pending else ""),
-            ("Confirmed", str(len(confirmed)), "ok" if confirmed else ""),
-            ("Human gate", "ENABLED" if st.session_state.human_confirm else "BYPASS", ""),
-            ("Plate OCR", "ACTIVE" if road.plate_detection_enabled else "OFF", ""),
-        ]
-    )
-
-    if pending:
-        render_section("Review queue", "Operator action required before dispatch.")
-        for inc in pending[:5]:
-            sev = inc.get("severity", "unknown")
-            badge = render_badge(sev.upper(), sev)
-            with st.container(border=True):
-                render_panel_header(
-                    f"Incident @ {inc['timestamp_sec']:.1f}s · score {inc['score']:.2f}",
-                    badge,
-                )
-                render_meta_grid(
-                    [
-                        ("Identifier", inc["id"][:8] + "…"),
-                        ("Event", inc.get("event_type", "—")),
-                        ("Signals", ", ".join(inc.get("signals") or [])),
-                    ]
-                )
-                c1, c2, c3 = st.columns([1, 1, 2])
-                with c1:
-                    if st.button("Confirm dispatch", key=f"live_ok_{inc['id']}", type="primary"):
-                        _confirm_incident(inc["id"])
-                        st.rerun()
-                with c2:
-                    if st.button("Dismiss", key=f"live_no_{inc['id']}"):
-                        _dismiss_incident(inc["id"])
-                        st.rerun()
-                clip = incidents_dir / f"{inc['id']}.mp4"
-                if clip.exists():
-                    with c3:
-                        st.video(str(clip))
-                elif (incidents_dir / f"{inc['id']}.json").exists():
-                    with c3:
-                        st.caption("Demo record — evidence clip appears after live processing.")
-    elif confirmed:
-        render_section("Last verified incident")
-        last = confirmed[0]
-        badge = render_badge(last.get("state", "confirmed"), "confirmed")
-        with st.container(border=True):
-            render_panel_header(
-                f"{last['severity'].upper()} · {last.get('event_type', '')} @ {last['timestamp_sec']:.1f}s",
-                badge,
-            )
-            render_meta_grid(
-                [
-                    ("Dispatch", last.get("dispatch_status", "—")),
-                    ("Source", Path(str(last.get("source_video", "—"))).name),
-                ]
-            )
-            clip = incidents_dir / f"{last['id']}.mp4"
-            if clip.exists():
-                st.video(str(clip))
-            if last.get("latitude") and last.get("longitude"):
-                st.map({"lat": [last["latitude"]], "lon": [last["longitude"]]})
-    else:
-        render_empty("No active incidents. Submit footage in Analysis lab to begin detection.")
-
-    st.markdown(
-        '<p style="font-size:0.6875rem;color:#5f6872;margin-top:1rem;">'
-        "Live ingest: <code style='font-family:IBM Plex Mono,monospace;'>"
-        "scripts/run_live.py --camera 0</code> or <code>--rtsp &lt;url&gt;</code></p>",
-        unsafe_allow_html=True,
-    )
-
-# —— Analysis lab ——
-elif page == "Analysis lab":
-    render_section(
-        "Analysis lab",
-        "Process recorded footage through the detection pipeline for validation and demonstration.",
-    )
-
-    st.caption(
-        "No custom accident training required — pretrained YOLOv8 (vehicles) + rule-based collision logic. "
-        "One-time setup: deps, yolov8n.pt, lap. See docs/SETUP_AND_TRAINING.md."
-    )
-
-    def _queue_pipeline_job(video_path: Path, out_name: str) -> None:
-        if not video_path.exists():
-            st.error(f"File not found: {video_path}")
-            return
-        if st.session_state.get("pipeline_pid") is not None:
-            st.warning("A job is already running.")
-            return
-        st.session_state.pipeline_busy = True
-        st.session_state.pipeline_pid = start_pipeline_job(video_path, out_name)
-        st.session_state.pipeline_out = out_name
-        st.session_state.pipeline_started = _time.time()
-        st.session_state.pop("pipeline_error", None)
-        st.session_state.pop("pipeline_done_out", None)
-        st.session_state.pop("pipeline_proc", None)
-        dbg(
-            "app.py:tab_lab",
-            "job_queued",
-            {"path": str(video_path), "out": out_name, "pid": st.session_state.pipeline_pid},
-            hypothesis_id="H2",
-            run_id="post-fix",
+    if primary:
+        render_collision_hero(
+            incident=primary,
+            incidents_dir=incidents_dir,
+            settings=settings,
+            total_in_run=len(run_events),
+            confirm_fn=_confirm_incident,
+            dismiss_fn=_dismiss_incident,
         )
-        st.rerun()
+    elif st.session_state.get("pipeline_done_out"):
+        st.warning(
+            "Processing finished but no collision/near-miss was stored for this run. "
+            "Try lowering **Confirm frames** or **IoU threshold** in Upload & test lab."
+        )
 
-    if st.session_state.get("pipeline_done_out") and not st.session_state.get("pipeline_pid"):
-        out_name = st.session_state.get("pipeline_done_out", "dashboard_test.mp4")
-        st.success("Processing complete.")
-        out_path = output_dir / out_name
-        if out_path.exists() and out_path.stat().st_size > 10_000:
-            st.caption(f"Output: `{out_path}` ({out_path.stat().st_size // (1024 * 1024)} MB)")
-            with st.expander("Play annotated video"):
-                st.video(str(out_path))
-    elif st.session_state.get("pipeline_error") and not st.session_state.get("pipeline_pid"):
-        st.error(f"Pipeline failed. {pipeline_error_hint()}")
+pending = asyncio.run(load_incidents(state="pending_review"))
+confirmed = asyncio.run(load_incidents(state="confirmed"))
+zones = asyncio.run(store.list_cooldown_zones())
+dispatch_logs = asyncio.run(store.list_dispatch_log(limit=50))
+last_dispatch_at = dispatch_logs[0]["created_at"] if dispatch_logs else None
 
-    uploads_dir = settings.resolve_path("data/uploads")
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    samples = settings.resolve_path(settings.paths.samples_dir)
-    sample_videos = sorted(samples.glob("*.mp4")) if samples.exists() else []
-
-    st.info(
-        "Use **Process sample from disk** below. Browser upload is disabled — it was causing "
-        "Streamlit disconnects on this machine."
+if page == "Live operations":
+    render_live_operations(
+        store=store,
+        settings=settings,
+        incidents_dir=incidents_dir,
+        output_dir=output_dir,
+        pending=pending,
+        confirmed=confirmed,
+        cooldown_count=len(zones),
+        last_dispatch_at=last_dispatch_at,
+        pipeline_busy=pipeline_busy,
+        confirm_fn=_confirm_incident,
+        dismiss_fn=_dismiss_incident,
     )
 
-    with st.expander("Process a local file path (no browser upload)"):
-        default_path = str(samples / sample_videos[0].name) if sample_videos else ""
-        local_path = st.text_input(
-            "Absolute or relative path on this PC",
-            value=default_path,
-            key="lab_local_path",
-        )
-        out_name_local = st.text_input("Output label", value="dashboard_local.mp4", key="out_local")
-        if st.button("Process local path"):
-            _queue_pipeline_job(Path(local_path), out_name_local)
-
-    render_section("Local sample library", "Process from disk — most reliable.")
-    if sample_videos:
-        choice = st.selectbox("Sample file", [v.name for v in sample_videos], key="sample_pick")
-        out_name_sample = st.text_input("Output label", value=f"annotated_{Path(choice).stem}.mp4", key="out_sample")
-        if st.button("Process sample from disk", type="primary"):
-            _queue_pipeline_job(samples / choice, out_name_sample)
-    else:
-        render_empty("Put .mp4 files in data/samples/ then use Process sample from disk.")
-
-
-# —— Incident registry ——
-elif page == "Incident registry":
-    render_section("Incident registry", "Search, filter, and adjudicate stored detections.")
-
-    f1, f2, f3 = st.columns([1, 1, 1])
-    with f1:
-        severity_filter = st.selectbox("Severity", ["All", "near_miss", "collision", "severe"], label_visibility="visible")
-    with f2:
-        state_filter = st.selectbox(
-            "State",
-            ["All", "pending_review", "confirmed", "dismissed"],
-            label_visibility="visible",
-        )
-    with f3:
-        st.markdown("<div style='height:1.75rem'></div>", unsafe_allow_html=True)
-
-    sev = None if severity_filter == "All" else severity_filter
-    state = None if state_filter == "All" else state_filter
-    incidents = asyncio.run(load_incidents(severity=sev, state=state))
-    dbg(
-        "app.py:tab_registry",
-        "tab_loaded",
-        {"count": len(incidents), "severity": severity_filter, "state": state_filter},
-        hypothesis_id="H15",
-        run_id="post-fix",
+elif page == "Upload & test lab":
+    render_lab_detection_result(
+        store=store,
+        settings=settings,
+        incidents_dir=incidents_dir,
+        pipeline_busy=pipeline_busy,
+        confirm_fn=_confirm_incident,
+        dismiss_fn=_dismiss_incident,
+    )
+    render_test_lab(
+        settings=settings,
+        incidents_dir=incidents_dir,
+        output_dir=output_dir,
+        uploads_dir=uploads_dir,
+        samples_dir=samples_dir,
+        queue_job=_queue_pipeline_job,
+        api_base=st.session_state.get("api_base", API_BASE),
     )
 
-    render_stat_grid([("Matching records", str(len(incidents)), "")])
+elif page == "Incidents":
+    render_incidents_screen(
+        store=store,
+        incidents_dir=incidents_dir,
+        output_dir=output_dir,
+        load_incidents_fn=load_incidents,
+        confirm_fn=_confirm_incident,
+        dismiss_fn=_dismiss_incident,
+    )
 
-    page_size = 25
-    total_pages = max(1, (len(incidents) + page_size - 1) // page_size)
-    page_num = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
-    page_slice = incidents[(page_num - 1) * page_size : page_num * page_size]
-    st.caption(f"Showing {(page_num - 1) * page_size + 1}–{(page_num - 1) * page_size + len(page_slice)} of {len(incidents)}")
-
-    if not incidents:
-        render_empty("No records match the current filters.")
-    else:
-        for inc in page_slice:
-            state_val = inc.get("state", "unknown")
-            sev = inc.get("severity", "unknown")
-            badge = render_badge(f"{state_val.replace('_', ' ')}", state_val if state_val in SEVERITY_CLASS else sev)
-            plates = inc.get("plate_numbers") or []
-            title = f"{sev.upper()} · {inc.get('event_type', '')} · t={inc['timestamp_sec']:.1f}s"
-            with st.expander(title, expanded=state_val == "pending_review"):
-                st.markdown(badge, unsafe_allow_html=True)
-                render_meta_grid(
-                    [
-                        ("ID", inc["id"]),
-                        ("Dispatch", inc.get("dispatch_status", "—")),
-                        ("Score", f"{inc.get('score', 0):.2f}"),
-                        ("Signals", ", ".join(inc.get("signals") or [])),
-                        ("Tracks", str(inc.get("track_ids") or "—")),
-                        ("Plates", ", ".join(plates) if plates else "Not extracted"),
-                        ("Source", Path(str(inc.get("source_video", "—"))).name),
-                    ]
-                )
-                if inc.get("latitude"):
-                    st.caption(f"{inc.get('location_label')} — {inc['latitude']}, {inc['longitude']}")
-                    st.map({"lat": [inc["latitude"]], "lon": [inc["longitude"]]})
-
-                if state_val == "pending_review":
-                    b1, b2 = st.columns(2)
-                    if b1.button("Confirm dispatch", key=f"c_{inc['id']}", type="primary"):
-                        _confirm_incident(inc["id"])
-                        st.rerun()
-                    if b2.button("Dismiss", key=f"d_{inc['id']}"):
-                        _dismiss_incident(inc["id"])
-                        st.rerun()
-
-                clip = incidents_dir / f"{inc['id']}.mp4"
-                if clip.exists():
-                    with st.expander("Play evidence clip"):
-                        st.video(str(clip))
-                kf = incidents_dir / f"{inc['id']}_keyframe.jpg"
-                if kf.exists():
-                    st.image(str(kf), caption="Reference frame")
-
-    render_section("Annotated exports")
-    exports = sorted(output_dir.glob("*.mp4")) if output_dir.exists() else []
-    if exports:
-        pick = st.selectbox("Preview export", [v.name for v in exports], key="export_pick")
-        if pick:
-            st.caption(str(output_dir / pick))
-            with st.expander("Play export"):
-                st.video(str(output_dir / pick))
-    else:
-        render_empty("No annotated exports generated yet.")
-
-
-# —— Dispatch log ——
 elif page == "Dispatch log":
-    rt = road.severity_routing
-    render_section(
-        "Dispatch log",
-        f"Routing policy — near miss: {rt.near_miss}, collision: {rt.collision}, severe: {rt.severe}",
-    )
-    _t0 = _time.perf_counter()
-    logs = asyncio.run(load_dispatch())
-    dbg("app.py:tab_dispatch", "tab_loaded", {"ms": round((_time.perf_counter() - _t0) * 1000)}, hypothesis_id="H4")
-    if logs:
-        render_html_table(
-            logs,
-            [
-                ("created_at", "Time"),
-                ("action", "Action"),
-                ("channel", "Channel"),
-                ("target", "Target"),
-                ("severity", "Severity"),
-                ("status", "Status"),
-            ],
-        )
-    else:
-        render_empty("No dispatch events recorded. Confirm an incident to initiate routing.")
+    render_dispatch_screen(dispatch_logs, incidents_dir, road)
 
-# —— Cooldown zones ——
-elif page == "Cooldown zones":
-    render_section(
-        "Cooldown zones",
-        f"Duplicate suppression — {settings.collision.cooldown_seconds}s window, "
-        f"{settings.collision.cooldown_distance_px}px spatial radius (image coordinates).",
-    )
-    zones = asyncio.run(load_cooldown())
+elif page == "Cameras & health":
+    render_cameras_screen(settings, pipeline_busy)
+
+elif page == "Analytics":
+    summary = asyncio.run(store.analytics_summary())
+    timeline = asyncio.run(store.analytics_timeline())
+    pins = asyncio.run(store.map_pins())
+    render_analytics_screen(summary, timeline, pins)
+    from dashboard.theme import plot_cooldown_chart, render_section
+
+    render_section("Cooldown zones")
     if zones:
         plot_cooldown_chart(zones)
-        render_html_table(
-            zones,
-            [
-                ("reason", "Reason"),
-                ("x", "X"),
-                ("y", "Y"),
-                ("radius_px", "Radius"),
-                ("expires_at", "Expires"),
-            ],
-        )
     else:
-        render_empty("No cooldown zones in the current window.")
-
-# —— Statistics ——
-elif page == "Statistics":
-    render_section("Operational statistics", "Aggregate incident classification for the active dataset.")
-    summary = asyncio.run(load_analytics())
-    pending_n = summary.get("pending_review", 0)
-    by_sev = summary.get("by_severity") or {}
-
-    render_stat_grid(
-        [
-            ("Pending review", str(pending_n), "warning" if pending_n else ""),
-            ("Classifications", str(sum(by_sev.values())), ""),
-            ("Categories", str(len(by_sev)), ""),
-        ]
-    )
-    render_section("Distribution by severity")
-    render_analytics_bars(by_sev)
+        st.caption("No active cooldown zones.")

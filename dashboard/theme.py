@@ -412,6 +412,53 @@ def inject_theme() -> None:
             font-size: 0.625rem;
             letter-spacing: 0.06em;
         }}
+        .rsos-topbar-meta {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            align-items: center;
+            font-size: 0.75rem;
+            color: {COLORS["text_secondary"]};
+            font-family: 'IBM Plex Mono', monospace;
+            margin-top: 0.35rem;
+        }}
+        .rsos-conn-ok {{ color: {COLORS["ok"]}; }}
+        .rsos-conn-warn {{ color: {COLORS["warning"]}; }}
+        .rsos-conn-off {{ color: {COLORS["text_muted"]}; }}
+        .rsos-status-strip {{
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin: 0.75rem 0 1.25rem 0;
+        }}
+        .rsos-status-pill {{
+            font-size: 0.625rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 0.35rem 0.75rem;
+            border-radius: 2px;
+            border: 1px solid {COLORS["border"]};
+            color: {COLORS["text_muted"]};
+            background: {COLORS["surface"]};
+        }}
+        .rsos-status-pill.active {{
+            border-color: {COLORS["accent"]};
+            color: {COLORS["text"]};
+            background: {COLORS["accent_dim"]};
+        }}
+        .rsos-status-pill.alert {{
+            border-color: {COLORS["critical"]};
+            color: {COLORS["critical"]};
+            background: rgba(184, 92, 80, 0.12);
+        }}
+        div.rsos-sos-btn button {{
+            font-weight: 600 !important;
+            letter-spacing: 0.06em !important;
+            background: {COLORS["critical"]} !important;
+            border: none !important;
+            color: #fff !important;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -422,13 +469,29 @@ def _esc(text: Any) -> str:
     return html.escape(str(text) if text is not None else "")
 
 
-def render_topbar(subtitle: str = "Traffic Accident Detection System") -> None:
+def render_topbar(
+    subtitle: str = "Emergency Response · Traffic Incident Detection",
+    *,
+    clock: str = "",
+    camera_name: str = "",
+    connection: str = "online",
+    webhook_on: bool = False,
+) -> None:
+    conn_cls = "rsos-conn-ok" if connection == "online" else ("rsos-conn-warn" if connection == "degraded" else "rsos-conn-off")
+    conn_label = "Stream online" if connection == "online" else ("Processing" if connection == "degraded" else "Offline")
+    hook = "Webhook armed" if webhook_on else "Webhook off"
     st.markdown(
         f"""
         <div class="rsos-topbar">
             <div>
                 <p class="rsos-brand">Road SOS</p>
                 <p class="rsos-subbrand">{_esc(subtitle)}</p>
+                <div class="rsos-topbar-meta">
+                    <span>{_esc(clock)}</span>
+                    <span>{_esc(camera_name)}</span>
+                    <span class="{conn_cls}">{_esc(conn_label)}</span>
+                    <span>{_esc(hook)}</span>
+                </div>
             </div>
             <div class="rsos-system-status">
                 <span class="rsos-status-dot"></span>
@@ -438,6 +501,17 @@ def render_topbar(subtitle: str = "Traffic Accident Detection System") -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def render_status_strip(active: str) -> None:
+    states = ["MONITORING", "INCIDENT", "DISPATCHED", "COOLDOWN"]
+    pills = []
+    for s in states:
+        cls = "rsos-status-pill"
+        if s == active:
+            cls += " alert" if s in ("INCIDENT", "DISPATCHED") else " active"
+        pills.append(f'<span class="{cls}">{s}</span>')
+    st.markdown(f'<div class="rsos-status-strip">{"".join(pills)}</div>', unsafe_allow_html=True)
 
 
 def render_section(title: str, description: str = "") -> None:
@@ -489,34 +563,17 @@ def render_html_table(rows: list[dict], columns: list[tuple[str, str]]) -> None:
 
 
 def render_analytics_bars(by_severity: dict[str, int]) -> None:
+    """Native Streamlit bars — avoids raw HTML showing as text in some Streamlit builds."""
     if not by_severity:
         render_empty("No classified incidents yet.")
         return
-    max_val = max(by_severity.values()) or 1
-    bars = []
-    tone_map = {"severe": "critical", "collision": "critical", "near_miss": "warning"}
-    for sev, count in sorted(by_severity.items(), key=lambda x: -x[1]):
-        pct = int(100 * count / max_val)
-        tone = tone_map.get(sev, "")
-        color = COLORS.get(tone, COLORS["accent"]) if tone else COLORS["accent"]
-        bars.append(
-            f"""
-            <div style="margin-bottom:0.75rem;">
-                <div style="display:flex;justify-content:space-between;font-size:0.6875rem;
-                    text-transform:uppercase;letter-spacing:0.06em;color:{COLORS["text_muted"]};margin-bottom:0.25rem;">
-                    <span>{_esc(sev)}</span>
-                    <span style="font-family:IBM Plex Mono,monospace;color:{COLORS["text"]};">{count}</span>
-                </div>
-                <div style="height:4px;background:{COLORS["grid"]};border-radius:1px;">
-                    <div style="width:{pct}%;height:100%;background:{color};border-radius:1px;"></div>
-                </div>
-            </div>
-            """
-        )
-    st.markdown(
-        f'<div class="rsos-panel" style="padding:1rem;">{"".join(bars)}</div>',
-        unsafe_allow_html=True,
-    )
+    import pandas as pd
+
+    ordered = sorted(by_severity.items(), key=lambda x: -x[1])
+    df = pd.DataFrame(ordered, columns=["severity", "count"]).set_index("severity")
+    st.bar_chart(df)
+    for sev, count in ordered:
+        st.progress(min(1.0, count / max(by_severity.values())), text=f"{sev}: {count}")
 
 
 def plot_cooldown_chart(zones: list[dict]) -> None:

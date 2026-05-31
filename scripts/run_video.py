@@ -40,11 +40,35 @@ def main() -> None:
         logger.error("Input not found: %s", input_path)
         sys.exit(1)
 
-    processor = AccidentDetectionProcessor(settings=settings)
+    from dashboard.pipeline_runner import update_job_progress
+
+    last_logged = 0
+
+    def on_progress(frames: int, total: int, fps: float) -> None:
+        nonlocal last_logged
+        update_job_progress(frames, total, fps)
+        if frames == total or frames - last_logged >= 30:
+            last_logged = frames
+            logger.info("Progress: %d / %d frames (%.1f fps)", frames, total, fps)
+
+    processor = AccidentDetectionProcessor(settings=settings, on_progress=on_progress)
     logger.info("Processing: %s", input_path)
     result = processor.process_source(VideoSource.from_file(input_path), output_name=args.output)
 
     asyncio.run(persist_incidents(processor, result))
+
+    from dashboard.run_summary import write_run_summary
+
+    try:
+        write_run_summary(
+            source_video=str(input_path),
+            output_name=args.output,
+            incidents=result.incidents,
+            frames=result.frames_processed,
+            fps=result.fps_avg,
+        )
+    except Exception as exc:
+        logger.exception("Failed to write run summary: %s", exc)
 
     logger.info("Done — %d frames @ %.1f FPS", result.frames_processed, result.fps_avg)
     if result.performance_estimate:

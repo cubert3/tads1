@@ -128,6 +128,22 @@ class Settings(BaseModel):
         return path if path.is_absolute() else ROOT_DIR / path
 
 
+def _apply_runtime_overrides(settings: Settings) -> Settings:
+    try:
+        from storage.runtime_settings import load_runtime
+
+        r = load_runtime()
+    except Exception:
+        return settings
+    if "proximity_px" in r:
+        settings.near_miss.proximity_px = float(r["proximity_px"])
+    if "confirm_frames" in r:
+        settings.collision.confirm_frames = int(r["confirm_frames"])
+    if "collision_iou_threshold" in r:
+        settings.collision.iou_threshold = float(r["collision_iou_threshold"])
+    return settings
+
+
 @lru_cache
 def get_settings(config_path: str | None = None) -> Settings:
     path = Path(config_path) if config_path else DEFAULT_CONFIG_PATH
@@ -135,4 +151,4 @@ def get_settings(config_path: str | None = None) -> Settings:
     if path.exists():
         with path.open("r", encoding="utf-8") as handle:
             raw = yaml.safe_load(handle) or {}
-    return Settings.model_validate(raw)
+    return _apply_runtime_overrides(Settings.model_validate(raw))
