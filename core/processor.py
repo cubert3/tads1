@@ -261,7 +261,7 @@ class AccidentDetectionProcessor:
                 else:
                     annotated = frame
 
-                self._evidence.push(packet.timestamp_sec, frame, annotated)
+                self._evidence.push(packet.timestamp_sec, annotated)
                 if writer is not None:
                     writer.write(annotated)
                 frames += 1

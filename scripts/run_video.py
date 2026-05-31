@@ -47,6 +47,12 @@ def main() -> None:
     asyncio.run(persist_incidents(processor, result))
 
     logger.info("Done — %d frames @ %.1f FPS", result.frames_processed, result.fps_avg)
+    if result.performance_estimate:
+        logger.info(
+            "Estimated vs actual: ~%.1f est / %.1f actual FPS",
+            result.performance_estimate.estimated_pipeline_fps,
+            result.fps_avg,
+        )
     logger.info("Incidents: %d", len(result.incidents))
     if result.annotated_path:
         logger.info("Annotated video: %s", result.annotated_path)

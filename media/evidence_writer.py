@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BufferedFrame:
     timestamp_sec: float
-    raw: np.ndarray
     annotated: np.ndarray
 
 
@@ -32,10 +31,9 @@ class EvidenceWriter:
         self._post_remaining = 0
         self._writer: cv2.VideoWriter | None = None
         self._current_incident_id: str | None = None
-        self._current_paths: dict[str, Path] = {}
 
-    def push(self, timestamp_sec: float, raw: np.ndarray, annotated: np.ndarray) -> None:
-        self._buffer.append(BufferedFrame(timestamp_sec, raw.copy(), annotated.copy()))
+    def push(self, timestamp_sec: float, annotated: np.ndarray) -> None:
+        self._buffer.append(BufferedFrame(timestamp_sec, annotated.copy()))
         if self._post_remaining > 0 and self._writer is not None:
             self._writer.write(annotated)
             self._post_remaining -= 1
@@ -46,7 +44,6 @@ class EvidenceWriter:
         self._current_incident_id = incident_id
         clip_path = self.incidents_dir / f"{incident_id}.mp4"
         keyframe_path = self.incidents_dir / f"{incident_id}_keyframe.jpg"
-        self._current_paths = {"clip": clip_path, "keyframe": keyframe_path}
 
         if not self._buffer:
             return clip_path, keyframe_path

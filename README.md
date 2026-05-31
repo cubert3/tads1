@@ -130,7 +130,7 @@ Example `sample_labels.json`:
 
 ```
 tads/
-├── core/           # Detection, tracking, motion, collision, processor
+├── core/           # detector, tracker, motion, collision, near_miss, performance, processor
 ├── media/          # Video reader, evidence writer, alerter
 ├── storage/        # SQLite incident store
 ├── api/            # FastAPI server
@@ -156,10 +156,26 @@ pip install torch transformers
 
 Set `clip_filter.enabled: true` in `config/settings.yaml`.
 
+### Performance estimate
+
+```bash
+python scripts/estimate_performance.py
+python scripts/estimate_performance.py --width 1920 --height 1080 --fps 30
+```
+
+### Sample video setup
+
+```bash
+python scripts/download_samples.py
+```
+
+Then add `.mp4` files to `data/samples/` per the printed manifest.
+
 ## Tests
 
 ```bash
 pytest tests/ -v
+pytest tests/ -v -m "not slow"   # skip YOLO inference test if no weights
 ```
 
 ## Limitations
